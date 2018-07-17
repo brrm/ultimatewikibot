@@ -1,0 +1,5 @@
+user_agent: "UNIQUE DESCRIPTIVE USER AGENT"
+client_id: "CLIENT ID FROM https://github.com/reddit-archive/reddit/wiki/OAuth2"
+client_secret: "CLIENT SECRET FROM https://github.com/reddit-archive/reddit/wiki/OAuth2"
+username: "BOT'S REDDIT USERNAME"
+password: "BOT'S REDDIT PASSWORD"

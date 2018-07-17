@@ -1,0 +1,1 @@
+INSERT APPROVED SUBREDDITS LINE BY LINE WITHOUT /R/ (ex: /r/pics --> pics)
