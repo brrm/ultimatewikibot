@@ -104,7 +104,7 @@ func updatevars() {
 	url := "https://api.reddit.com/user/" + config.BotUsername + "/comments"
 	// Send GET request
 	redditClient := http.Client{
-		Timeout: time.Second * 2,
+		Timeout: time.Second * 4,
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	checkErr(err)

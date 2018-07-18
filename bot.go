@@ -286,7 +286,7 @@ func checkscore() {
 		url := "https://api.reddit.com" + permalink + ".json"
 		// Send GET request
 		redditClient := http.Client{
-			Timeout: time.Second * 2,
+			Timeout: time.Second * 4,
 		}
 		req, err := http.NewRequest(http.MethodGet, url, nil)
 		checkErr(err)
