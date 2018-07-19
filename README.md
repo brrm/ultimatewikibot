@@ -1,6 +1,6 @@
 # Ultimate Wikibot
 
-Source code for [/u/ultimatewikibot](https://reddit.com/r/ultimatewikibot). A simple wikipedia bot written 100% in go. The bot also logs all interactions onto a google sheet.
+Source code for [/u/ultimatewikibot](https://reddit.com/u/ultimatewikibot). A simple wikipedia bot written 100% in go. The bot also logs all interactions onto a google sheet.
 
 # Install
 
