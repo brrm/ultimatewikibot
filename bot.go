@@ -2,9 +2,7 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -12,7 +10,6 @@ import (
 
 	"github.com/brrm/graw"
 	"github.com/brrm/graw/reddit"
-	"github.com/tidwall/gjson"
 )
 
 // Allows the reddit.Bot to be accessed anywhere
@@ -51,22 +48,18 @@ func (r *ultimatewikibot) Message(m *reddit.Message) error {
 
 // Post handler
 func (r *ultimatewikibot) Post(p *reddit.Post) error {
-	// Checks if it has replied to the post
-	if didnotreply(p.Name) {
-		// Check if post is link or text
-		var content string
-		var posttype string
-		if p.SelfText == "" {
-			content = p.URL
-			posttype = "Link"
-		} else {
-			content = p.SelfText
-			posttype = "Text"
-		}
-		// If it's the bot's own post, don't reply to it
-		if p.Author == config.BotUsername {
-			return nil
-		}
+	// Check if post is link or text
+	var content string
+	var posttype string
+	if p.SelfText == "" {
+		content = p.URL
+		posttype = "Link"
+	} else {
+		content = p.SelfText
+		posttype = "Text"
+	}
+	// If it's the bot's own post, don't reply to it
+	if p.Author != config.BotUsername {
 		// Check if author is blacklisted
 		if validateauthor(p.Author) {
 			// Get queries
@@ -78,8 +71,6 @@ func (r *ultimatewikibot) Post(p *reddit.Post) error {
 				if valid {
 					// Log all the data
 					logger(logdata{Subreddit: p.Subreddit, Author: p.Author, Posttype: posttype, Permalink: p.Permalink, Reqtype: reqtype, Wikidatas: wds})
-					// Add the post permalink to replied_posts
-					replied_posts = append(replied_posts, p.Permalink)
 					// Generate reply out of wikidata
 					return r.bot.Reply(p.Name, formatreply(wds, reqtype))
 				}
@@ -94,13 +85,8 @@ func (r *ultimatewikibot) Post(p *reddit.Post) error {
 
 // Comment handler
 func (r *ultimatewikibot) Comment(c *reddit.Comment) error {
-	// Checks if it has replied to the comment
-	if didnotreply(c.Name) {
-		// If it's the bot's own comment don't reply to it, add the permalink to bot_comments
-		if c.Author == config.BotUsername {
-			bot_comments = append(bot_comments, c.Permalink)
-			return nil
-		}
+	// Check if it's the bot's own comment
+	if c.Author != config.BotUsername {
 		// Check if author is blacklisted
 		if validateauthor(c.Author) {
 			// Get queries
@@ -112,8 +98,6 @@ func (r *ultimatewikibot) Comment(c *reddit.Comment) error {
 				if valid {
 					// Log all the data
 					logger(logdata{Subreddit: c.Subreddit, Author: c.Author, Posttype: "Comment", Permalink: c.Permalink, Reqtype: reqtype, Wikidatas: wds})
-					// Add the comment permalink to replied_posts
-					replied_posts = append(replied_posts, c.Permalink)
 					// Generate reply out of wikidata
 					return r.bot.Reply(c.Name, formatreply(wds, reqtype))
 				}
@@ -223,17 +207,6 @@ func getqueries(s string) (int, []string) {
 // Given a slice of wikidata, and type of request, returns a formatted reply string
 func formatreply(wds []wikidata, reqtype int) string {
 	var replysections []string
-	// Header
-	if reqtype == 1 {
-		replysections = append(replysections, "Looks like you summoned me by using my call command \"wikibot what is?\"...\n\n")
-	} else {
-		if len(wds) > 1 {
-			replysections = append(replysections, "Looks like you posted some wikipedia articles, let me summarize them for you...\n\n")
-		} else {
-			replysections = append(replysections, "Looks like you posted a wikipedia article, let me summarize it for you...\n\n")
-		}
-	}
-	replysections = append(replysections, "Click [here](https://reddit.com/message/compose?to="+config.BotUsername+"&subject=Blacklist&message=Me) if you'd like me to stop bugging you.\n*****\n")
 	// Body
 	for _, wd := range wds {
 		if wd.Image != "" {
@@ -243,8 +216,7 @@ func formatreply(wds []wikidata, reqtype int) string {
 		}
 	}
 	// Footer
-	replysections = append(replysections, "**^([)** ^([About](https://np.reddit.com/r/ultimatewikibot/wiki/index)) **^(|)** ^([Source code](https://github.com/brrm/ultimatewikibot)) **^(|)** ^(Downvote to remove) **^(])**\n")
-
+	replysections = append(replysections, "^[About](https://www.reddit.com/user/ultimatewikibot/comments/90r969/about) ^| ^[Leave](https://reddit.com/message/compose?to="+config.BotUsername+"&subject=Blacklist&message=Me) ^[me](https://reddit.com/message/compose?to="+config.BotUsername+"&subject=Blacklist&message=Me) ^[alone](https://reddit.com/message/compose?to="+config.BotUsername+"&subject=Blacklist&message=Me)\n")
 	// Return reply
 	return strings.Join(replysections, "")
 }
@@ -277,46 +249,4 @@ func validatequeries(queries []string) (bool, []wikidata) {
 		}
 	}
 	return ok, wds
-}
-
-// Checks if score is below -1, if so removes comment
-func checkscore() {
-	// Gets the score for a given comment permalink
-	getscore := func(permalink string) int64 {
-		url := "https://api.reddit.com" + permalink + ".json"
-		// Send GET request
-		redditClient := http.Client{
-			Timeout: time.Second * 4,
-		}
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		checkErr(err)
-		req.Header.Set("User-Agent", "ubuntu:github.com/brrm/ultimatewikibot:v0.1 (by /u/litllsnek)")
-		// Parse response
-		res, err := redditClient.Do(req)
-		checkErr(err)
-		body, err := ioutil.ReadAll(res.Body)
-		checkErr(err)
-		commentjson := string(body)
-		// Get score from json
-		return gjson.Get(commentjson, "1.data.children.0.data.score").Int()
-	}
-	// Checks scores for all of the bot's comments
-	for _, bot_comment := range bot_comments {
-		score := getscore(bot_comment)
-		// If the score is less than -1
-		if score < -1 {
-			// Delete the comment (bit inside is converting permalink to id)
-			botglobal.bot.Delete("t1_" + bot_comment[len(bot_comment)-8:len(bot_comment)-1])
-		}
-	}
-}
-
-// Checks if it the post has already been replied to
-func didnotreply(name string) bool {
-	for _, rp := range replied_posts {
-		if name == rp {
-			return false
-		}
-	}
-	return true
 }

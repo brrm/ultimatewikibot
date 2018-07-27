@@ -18,8 +18,6 @@ func main() {
 	go func() {
 		<-c
 		pushlog()
-		writefile("bot_comments.txt", bot_comments)
-		writefile("replied_posts.txt", replied_posts)
 		writefile("blacklisted_users.txt", blacklisted_users)
 		os.Exit(1)
 	}()

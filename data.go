@@ -4,15 +4,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/tidwall/gjson"
 )
 
 type conf struct {
@@ -27,16 +23,13 @@ var (
 	config conf
 	// Slice of approved subs
 	approved_subs = readfile("approved_subs.txt")
-	// Slice of permalinks of the bot's comments
-	bot_comments []string
-	// Slice of posts already replied to
-	replied_posts []string
+	// Slice with other miscellaneous data the bot needs to remember between boots
+	other_data = readfile("other_data.txt")
 )
 
 func init() {
 	_, err := toml.DecodeFile("data/config.toml", &config)
 	checkErr(err)
-	updatevars()
 }
 
 // Opens given file and returns sliced string of every line inside the file
@@ -71,9 +64,8 @@ func cyclefuncs() {
 		for {
 			select {
 			case <-ticker.C:
-				updatevars()
 				pushlog()
-				checkscore()
+				checkduplicates()
 				writefile("blacklisted_users.txt", blacklisted_users)
 			case <-quit:
 				ticker.Stop()
@@ -97,30 +89,4 @@ func writefile(filepath string, data []string) {
 	}
 	err = w.Flush()
 	checkErr(err)
-}
-
-// Updates bot_comments and replied_posts
-func updatevars() {
-	url := "https://api.reddit.com/user/" + config.BotUsername + "/comments"
-	// Send GET request
-	redditClient := http.Client{
-		Timeout: time.Second * 4,
-	}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	checkErr(err)
-	req.Header.Set("User-Agent", "ubuntu:github.com/brrm/ultimatewikibot:v0.1 (by /u/litllsnek)")
-	// Parse response
-	res, err := redditClient.Do(req)
-	checkErr(err)
-	body, err := ioutil.ReadAll(res.Body)
-	checkErr(err)
-	datajson := string(body)
-	// Reset vars
-	bot_comments = []string{}
-	replied_posts = []string{}
-	// Update vars
-	for i := 0; i < int(gjson.Get(datajson, "data.children.#").Int()); i++ {
-		bot_comments = append(bot_comments, gjson.Get(datajson, "data.children."+strconv.Itoa(i)+".data.permalink").String())
-		replied_posts = append(replied_posts, gjson.Get(datajson, "data.children."+strconv.Itoa(i)+".data.parent_id").String())
-	}
 }
